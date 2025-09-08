@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    // Target modern Node
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+
+    // Generate JS to dist if you ever build
+    "outDir": "dist",
+    "rootDir": "src",
+
+    // Quality of life
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Pick up Node globals/types
+    "types": ["node"],
+
+    // Optional, but nice for debugging
+    "sourceMap": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}
