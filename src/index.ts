@@ -29,6 +29,9 @@ app.use(
 
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+// src/index.ts (near the top, before cookieSession)
+app.set("trust proxy", 1);
+
 
 // Cookie session
 app.use(
