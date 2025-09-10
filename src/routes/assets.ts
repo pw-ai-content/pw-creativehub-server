@@ -5,6 +5,9 @@ import path from "path";
 import fs from "fs";
 import Asset from "../models/Asset";
 import { requireUser, requireRole } from "../middleware/auth";
+import { ensureFolderPath, uploadFileToDrive, streamDriveFile } from "../services/drive";
+
+
 
 const router = Router();
 
@@ -43,9 +46,18 @@ const upload = multer({
 });
 
 // helper to normalize _id → id for FE
+// replace your mapDoc
 const mapDoc = (d: any) => {
-  const { _id, approval, thumb, url,   ...rest } = d;
-  return { id: String(_id), ...rest, 
+  const {
+    _id, approval, thumb, url,
+    driveFileId, driveFolderId, driveWebViewLink, driveWebContentLink,
+    mimeType,
+    ...rest
+  } = d;
+
+  return {
+    id: String(_id),
+    ...rest,
     thumb: absolutize(thumb),
     url: absolutize(url || thumb),
     approval: approval
@@ -57,7 +69,9 @@ const mapDoc = (d: any) => {
             : undefined,
         }
       : { status: "yellow" },
-  }; };
+  };
+};
+
 
 
 /**
@@ -65,7 +79,7 @@ const mapDoc = (d: any) => {
  * - SME sees only admin uploads (so they can review them)
  * - Others see everything (apply search like before)
  */
-router.get("/", requireUser, async (req: any, res) => {
+router.get("/", async (req: any, res) => {
   const q = String(req.query.q || "").trim();
 
   const search = q
@@ -85,6 +99,25 @@ router.get("/", requireUser, async (req: any, res) => {
 
   const docs = await Asset.find(find).sort({ createdAt: -1 }).lean();
   res.json({ items: docs.map(mapDoc) });
+});
+
+// GET /api/assets/:id/file  (requires login)
+router.get("/:id/file", requireUser, async (req: any, res) => {
+  const doc = await Asset.findById(req.params.id).lean();
+  const item = doc as any;  
+  if (!item || !item.driveFileId) {
+    return res.status(404).json({ error: "not found" });
+  }
+
+  if (item.mimeType) res.setHeader("Content-Type", item.mimeType);
+  await Asset.updateOne({ _id: req.params.id }, { $inc: { downloads: 1 } });
+
+  try {
+    await streamDriveFile(item.driveFileId, res);
+  } catch (e) {
+    console.error("streamDriveFile error:", e);
+    if (!res.headersSent) res.status(500).json({ error: "stream error" });
+  }
 });
 
 
@@ -111,24 +144,80 @@ router.post(
       meta = req.body;
     }
 
-    const thumb = `${PUBLIC_BASE}/uploads/${req.file.filename}`;
+
+        // 1) Validate taxonomy (all required)
+    const required = ["grade", "subject", "chapter", "topic", "subtopic", "artStyle"];
+    const missing = required.filter((k) => !meta[k]);
+    if (missing.length) {
+      return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+    }
+
+    // 2) Build folder path in Drive (you can tweak chapter formatting)
+    const folderSegments = [
+      String(meta.grade),
+      String(meta.subject),
+      String(meta.chapter),
+      String(meta.topic),
+      String(meta.subtopic),
+      String(meta.artStyle),
+    ];
+   // Build folder path in Drive
+    let driveFolderId: string;
+    try {
+      driveFolderId = await ensureFolderPath(folderSegments);
+    } catch (e) {
+      console.error("ensureFolderPath error:", e);
+      return res.status(500).json({ error: "drive folder error" });
+    }
+
+    // Upload file to Drive
+    let driveUpload: any;
+    try {
+      driveUpload = await uploadFileToDrive(
+        driveFolderId,
+        req.file.path,
+        req.file.originalname,   // or your computed `${code}${ext}`
+        req.file.mimetype
+      );
+    } catch (e) {
+      console.error("uploadFileToDrive error:", e);
+      return res.status(500).json({ error: "drive upload error" });
+    }
+
+    // const thumb = `${PUBLIC_BASE}/uploads/${req.file.filename}`;
+    //const thumb = `/uploads/${req.file.filename}`;   // no PUBLIC_BASE here
+    // AFTER — use Google Drive URL coming from uploadFileToDrive
+    // driveUpload should contain publicViewUrl, webViewLink, webContentLink, mimeType, fileId, etc.
+    const thumbUrl = driveUpload.publicViewUrl ?? driveUpload.webViewLink ?? `/api/assets/${req.file.filename}`;
+
+    // (optional) cleanup local file—Render disks are ephemeral anyway
+    try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+
+    // 4) Construct a title if not provided
+    const baseTitle = meta.title?.trim() || meta.subtopic || "Untitled";
 
     const doc = await Asset.create({
       ...meta,
-      thumb,
-      url: thumb,
-      type: meta.type || "photo",
+      title: baseTitle,
+      type: "photo",
+      thumb: thumbUrl,   // << use Drive public URL for thumbnails
+      url: thumbUrl,
       uploadedBy: req.user?.email,
-      uploaderRole: req.user?.role, // <— important
+      uploaderRole: req.user?.role,
       downloads: 0,
       views: 0,
-      // default Allotted for admin uploads so it shows in SME as "Allotted"
+      // defaults
       approval: { status: "yellow" },
-      review:
-        req.user?.role === "admin"
-          ? { status: "allotted" }
-          : undefined,
+      review: req.user?.role === "admin" ? { status: "allotted" } : undefined,
+
+      // Drive fields
+      driveFileId: driveUpload.fileId,
+      driveFolderId,
+      driveWebViewLink: driveUpload.webViewLink,
+      driveWebContentLink: driveUpload.webContentLink,
+      mimeType: driveUpload.mimeType,
     });
+    
 
     res.status(201).json({ item: mapDoc(doc.toObject()) });
   }

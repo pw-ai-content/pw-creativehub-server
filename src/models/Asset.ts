@@ -37,6 +37,11 @@ const AssetSchema = new Schema({
   thumb: { type: String, required: true },     // <-- used by frontend
   url: { type: String },                        // optional legacy/alias
   tags: { type: [String], default: [] },
+  driveFileId: { type: String, index: true },
+  driveFolderId: { type: String },
+  driveWebViewLink: { type: String },
+  driveWebContentLink: { type: String },
+  mimeType: { type: String },
 
 
   uploadedBy: { type: String, index: true },

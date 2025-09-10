@@ -27,6 +27,13 @@ app.use(
   })
 );
 
+// Allow all preflights for the allowed origins (esp. for file uploads and auth)
+app.options("*", cors({
+  origin: origins,
+  credentials: true,
+}));
+
+
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // src/index.ts (near the top, before cookieSession)

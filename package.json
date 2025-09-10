@@ -1,14 +1,16 @@
 {
   "name": "pw-creativehub-server",
   "version": "1.0.0",
-   "private": true,
+  "private": true,
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts"
   },
-  "engines": { "node": ">=18 <21" },
+  "engines": {
+    "node": ">=18 <21"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -16,10 +18,11 @@
   "dependencies": {
     "cookie-session": "^2.1.1",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
+    "dotenv": "^16.4.5",
     "express": "^5.1.0",
     "google-auth-library": "^10.3.0",
     "googleapis": "^159.0.0",
+    "mime-types": "^3.0.1",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2"
   },
@@ -27,6 +30,7 @@
     "@types/cookie-session": "^2.0.49",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/mime-types": "^3.0.1",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.3.0",
     "ts-node-dev": "^2.0.0",
