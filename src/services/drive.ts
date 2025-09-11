@@ -5,6 +5,7 @@ import path from "path";
 import mime from "mime-types";
 import type { Response } from "express";
 
+
 const DRIVE_ROOT_FOLDER_ID = process.env.DRIVE_ROOT_FOLDER_ID!;
 const SA_EMAIL = process.env.GOOGLE_DRIVE_SA_EMAIL!;
 
@@ -12,9 +13,9 @@ const SA_EMAIL = process.env.GOOGLE_DRIVE_SA_EMAIL!;
 let SA_PRIVATE_KEY = (process.env.GOOGLE_DRIVE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 
 // (Optional fallback) If you used a Render Secret File named GOOGLE_DRIVE_PRIVATE_KEY instead:
-// if (!SA_PRIVATE_KEY && fs.existsSync("/etc/secrets/GOOGLE_DRIVE_PRIVATE_KEY")) {
-//   SA_PRIVATE_KEY = fs.readFileSync("/etc/secrets/GOOGLE_DRIVE_PRIVATE_KEY", "utf8");
-// }
+if (!SA_PRIVATE_KEY && fs.existsSync("/etc/secrets/GOOGLE_DRIVE_PRIVATE_KEY")) {
+  SA_PRIVATE_KEY = fs.readFileSync("/etc/secrets/GOOGLE_DRIVE_PRIVATE_KEY", "utf8");
+}
 
 if (!DRIVE_ROOT_FOLDER_ID || !SA_EMAIL || !SA_PRIVATE_KEY) {
   console.warn("[Drive] Missing env vars: DRIVE_ROOT_FOLDER_ID / GOOGLE_DRIVE_SA_EMAIL / GOOGLE_DRIVE_PRIVATE_KEY");
@@ -91,6 +92,16 @@ export async function uploadFileToDrive(
     requestBody: { role: "reader", type: "anyone" },
   });
 
+  app.get("/api/debug/drive", async (_req, res) => {
+  try {
+    const id = await ensureFolderPath(["_healthcheck"]);
+    res.json({ ok: true, id });
+  } catch (e: any) {
+    console.error("Drive debug error:", e?.response?.data || e);
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
   return {
     fileId,
     name: res.data.name,
@@ -102,6 +113,7 @@ export async function uploadFileToDrive(
     publicViewUrl: `https://drive.google.com/uc?id=${fileId}&export=view`,
   };
 }
+
 
 /** Stream a Drive file (download) directly to the HTTP response. */
 export async function streamDriveFile(fileId: string, res: Response) {

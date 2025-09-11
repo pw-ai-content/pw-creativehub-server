@@ -8,6 +8,7 @@ import { attachUser } from "./middleware/auth";
 import { getRoleForEmail } from "./services/rolesFromSheet";
 import path from "path";
 import assetsRoutes from "./routes/assets";
+import { ensureFolderPath } from "./services/drive";
 
 
 const app = express();
@@ -58,6 +59,16 @@ app.use(attachUser);
 // Routes
 app.use("/api", authRoutes);
 app.use("/api/assets", assetsRoutes);
+
+app.get("/api/debug/drive", async (_req, res) => {
+  try {
+    const id = await ensureFolderPath(["_healthcheck"]);
+    res.json({ ok: true, id });
+  } catch (e: any) {
+    console.error("Drive debug error:", e?.response?.data || e);
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
 
 
 // ---- DEV: test Google Sheet role lookup ----

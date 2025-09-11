@@ -161,6 +161,9 @@ router.post(
       String(meta.subtopic),
       String(meta.artStyle),
     ];
+
+    console.log("[Drive] Building path:", folderSegments.join(" / "));
+
    // Build folder path in Drive
     let driveFolderId: string;
     try {
@@ -169,6 +172,8 @@ router.post(
       console.error("ensureFolderPath error:", e);
       return res.status(500).json({ error: "drive folder error" });
     }
+
+    
 
     // Upload file to Drive
     let driveUpload: any;
@@ -183,6 +188,13 @@ router.post(
       console.error("uploadFileToDrive error:", e);
       return res.status(500).json({ error: "drive upload error" });
     }
+    // after uploadFileToDrive(...)
+    console.log("[Drive] Uploaded", {
+      fileId: driveUpload.fileId,
+      folderId: driveFolderId,
+      mimeType: driveUpload.mimeType,
+      publicViewUrl: driveUpload.publicViewUrl,
+    });
 
     // const thumb = `${PUBLIC_BASE}/uploads/${req.file.filename}`;
     //const thumb = `/uploads/${req.file.filename}`;   // no PUBLIC_BASE here
