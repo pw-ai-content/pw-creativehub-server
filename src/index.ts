@@ -14,6 +14,8 @@ import { ensureFolderPath } from "./services/drive";
 const app = express();
 const isProd = process.env.NODE_ENV === "production";
 const crossSite = true; // Netlify <-> Render are different domains
+app.set("trust proxy", true);
+
 
 // CORS (supports comma-separated origins in ALLOWED_ORIGIN)
 const origins = (process.env.ALLOWED_ORIGIN || "http://localhost:5173")
@@ -21,25 +23,20 @@ const origins = (process.env.ALLOWED_ORIGIN || "http://localhost:5173")
   .map((s) => s.trim())
   .filter(Boolean);
 
+// One global CORS middleware
 app.use(
   cors({
-    origin: origins,
+    origin: function (origin, cb) {
+      // allow non-browser tools (curl/Postman) which send no Origin
+      if (!origin) return cb(null, true);
+      return cb(null, origins.includes(origin));
+    },
     credentials: true,
   })
 );
 
-// Allow all preflights for the allowed origins (esp. for file uploads and auth)
-app.options("*", cors({
-  origin: origins,
-  credentials: true,
-}));
-
-
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-// src/index.ts (near the top, before cookieSession)
-app.set("trust proxy", 1);
-
 
 // Cookie session
 app.use(

@@ -62,4 +62,16 @@ router.post("/auth/logout", (req, res) => {
   res.json({ ok: true });
 });
 
+if (process.env.NODE_ENV !== "production") {
+  router.post("/dev-login", (req: any, res) => {
+    req.session = req.session || {};
+    req.session.user = {
+      email: "admin@pw.live",
+      name: "Local Admin",
+      role: "admin",
+    };
+    res.json({ ok: true, user: req.session.user });
+  });
+}
+
 export default router;
