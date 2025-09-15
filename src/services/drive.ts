@@ -46,7 +46,7 @@ export async function ensureFolderPath(segments: string[]) {
       "trashed = false",
     ].join(" and ");
 
-    const { data } = await drive.files.list({ q, fields: "files(id, name)", pageSize: 1 });
+    const { data } = await drive.files.list({ q, fields: "files(id, name)", pageSize: 1, supportsAllDrives: true, includeItemsFromAllDrives: true,});
     let folderId = data.files?.[0]?.id;
 
     if (!folderId) {
@@ -57,6 +57,7 @@ export async function ensureFolderPath(segments: string[]) {
           parents: [parentId],
         },
         fields: "id, name",
+        supportsAllDrives: true,
       });
       folderId = created.data.id!;
     }
@@ -83,41 +84,55 @@ export async function uploadFileToDrive(
     requestBody: { name, parents: [folderId], mimeType: String(mt) },
     media: { mimeType: String(mt), body: fs.createReadStream(localPath) },
     fields: "id, name, size, webViewLink, webContentLink, mimeType",
+    supportsAllDrives: true,
   });
 
   const fileId = res.data.id!;
   // Make the file publicly readable so thumbnails work without auth
   await drive.permissions.create({
     fileId,
-    requestBody: { role: "reader", type: "anyone" },
+    requestBody: { role: "reader", type: "anyone", allowFileDiscovery: false,},
+    supportsAllDrives: true,
   });
 
-  app.get("/api/debug/drive", async (_req, res) => {
-  try {
-    const id = await ensureFolderPath(["_healthcheck"]);
-    res.json({ ok: true, id });
-  } catch (e: any) {
-    console.error("Drive debug error:", e?.response?.data || e);
-    res.status(500).json({ ok: false, error: String(e) });
-  }
-});
+  
+// fetch metadata including thumbnailLink (needed for portal thumbs)
+    const meta = await drive.files.get({
+    fileId,
+    supportsAllDrives: true,
+    fields: "id,name,size,mimeType,webViewLink,webContentLink,thumbnailLink,iconLink",
+    });
+    // ADD: a stable, cacheable CDN thumbnail URL (size is adjustable, e.g. w600)
+  const publicThumbUrl = `https://lh3.googleusercontent.com/d/${fileId}=w800`;
 
   return {
-    fileId,
-    name: res.data.name,
-    size: res.data.size ? Number(res.data.size) : undefined,
-    webViewLink: res.data.webViewLink,
-    webContentLink: res.data.webContentLink,
-    mimeType: res.data.mimeType!,
-    // Good universal URL for <img> and thumbnails:
-    publicViewUrl: `https://drive.google.com/uc?id=${fileId}&export=view`,
-  };
+  fileId,
+  name: meta.data.name!,
+  size: meta.data.size ? Number(meta.data.size) : undefined,
+  mimeType: meta.data.mimeType!,
+  webViewLink: meta.data.webViewLink || null,
+  webContentLink: meta.data.webContentLink || null,
+  thumbnailLink: meta.data.thumbnailLink || null,
+  // good universal viewer URL for <img>
+  publicViewUrl: `https://drive.google.com/uc?id=${fileId}&export=view`,
+    publicThumbUrl, // <—— NEW
+};
+
 }
 
 
 /** Stream a Drive file (download) directly to the HTTP response. */
 export async function streamDriveFile(fileId: string, res: Response) {
   const drive = driveClient();
+  // look up mime so browser renders the image inline
+  const head = await drive.files.get({
+    fileId,
+    fields: "mimeType,name",
+    supportsAllDrives: true,
+  });
+  if (head.data.mimeType) res.setHeader("Content-Type", head.data.mimeType);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+
   const dl = await drive.files.get(
     { fileId, alt: "media" as any },
     { responseType: "stream" }
