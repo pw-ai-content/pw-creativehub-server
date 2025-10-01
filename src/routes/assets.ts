@@ -6,7 +6,7 @@ import fs from "fs";
 import Asset from "../models/Asset";
 import { requireUser, requireRole } from "../middleware/auth";
 import mime from "mime-types";
-import { ensureFolderPath, uploadFileToDrive, streamDriveFile } from "../services/drive";
+import { ensureFolderPath, uploadFileToDrive, streamDriveFile, deleteDriveFile } from "../services/drive";
 
 
 
@@ -490,10 +490,42 @@ router.patch("/:id/approval", requireRole("sme"), async (req: any, res) => {
 /**
  * DELETE /api/assets/:id
  */
+/**
+ * DELETE /api/assets/:id
+ * ?mode=portal     -> delete from portal (DB) only
+ * ?mode=permanent  -> delete from portal + Google Drive
+ */
 router.delete("/:id", requireRole("admin"), async (req, res) => {
-  const r = await Asset.deleteOne({ _id: req.params.id });
-  res.json({ ok: true, deleted: r.deletedCount });
+  const id = req.params.id;
+  const mode = (req.query.mode as "portal" | "permanent") || "portal";
+
+  // Load the asset to access driveFileId, etc.
+  const doc = await Asset.findById(id)
+  .select<{ _id: any; driveFileId?: string }>("_id driveFileId")
+  .lean<{ _id: any; driveFileId?: string }>();
+
+  if (!doc) return res.status(404).json({ error: "not found" });
+
+  // If permanent, try to delete from Drive first (best-effort)
+  if (mode === "permanent" && doc.driveFileId) {
+    try {
+      await deleteDriveFile(doc.driveFileId);
+    } catch (err) {
+      // Choose strict or lenient behavior. Here we log and continue with portal delete.
+      console.warn("[Drive] delete failed (continuing):", err);
+    }
+  }
+
+  // Remove from the portal (DB)
+  const r = await Asset.deleteOne({ _id: id });
+  return res.json({
+    ok: true,
+    deleted: r.deletedCount,
+    mode,
+    id,
+  });
 });
+
 
 /**
  * POST /api/assets/:id/download

@@ -9,6 +9,8 @@ import { getRoleForEmail } from "./services/rolesFromSheet";
 import path from "path";
 import assetsRoutes from "./routes/assets";
 import { ensureFolderPath } from "./services/drive";
+import taxonomyRoutes from "./routes/taxonomy";
+
 
 
 const app = express();
@@ -56,6 +58,7 @@ app.use(attachUser);
 // Routes
 app.use("/api", authRoutes);
 app.use("/api/assets", assetsRoutes);
+app.use("/api/taxonomy", taxonomyRoutes);
 
 app.get("/api/debug/drive", async (_req, res) => {
   try {

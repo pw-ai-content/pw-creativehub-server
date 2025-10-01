@@ -145,3 +145,24 @@ export async function streamDriveFile(fileId: string, res: Response) {
 
   dl.data.pipe(res);
 }
+
+// hard-delete a file from Google Drive
+export async function deleteDriveFile(fileId: string) {
+  const drive = driveClient();
+
+  try {
+    await drive.files.delete({
+      fileId,
+      supportsAllDrives: true, // important for shared drives
+    });
+    return { ok: true, fileId };
+  } catch (err: any) {
+    // If the file is already gone, treat as success to keep the API idempotent
+    if (err?.code === 404) {
+      return { ok: true, fileId, alreadyDeleted: true };
+    }
+    // Re-throw all other errors so the caller can decide
+    throw err;
+  }
+}
+

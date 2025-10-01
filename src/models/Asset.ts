@@ -1,21 +1,21 @@
 // src/models/Asset.ts
 import { Schema, model, models } from "mongoose";
 
-const ReviewSchema = new Schema(
-  {
-    status: {
-      type: String,
-      enum: ["allotted", "commented", "passed"],
-    },
-    assignedTo: String,        // SME email (optional, if you allot)
-    assignedToName: String,    // SME name (optional)
-    comment: String,           // SME comment
-    reviewedBy: String,        // SME email who took action
-    reviewedByName: String,    // SME name who took action
-    reviewedAt: Date,          // when comment/passed happened
-  },
-  { _id: false }
-);
+// const ReviewSchema = new Schema(
+//   {
+//     status: {
+//       type: String,
+//       enum: ["allotted", "commented", "passed"],
+//     },
+//     assignedTo: String,        // SME email (optional, if you allot)
+//     assignedToName: String,    // SME name (optional)
+//     comment: String,           // SME comment
+//     reviewedBy: String,        // SME email who took action
+//     reviewedByName: String,    // SME name who took action
+//     reviewedAt: Date,          // when comment/passed happened
+//   },
+//   { _id: false }
+// );
 
 const SMEApprovalSchema = new Schema(
   {
@@ -77,11 +77,11 @@ const AssetSchema = new Schema({
     default: { status: "yellow", approvedByEmail: null, approvedAt: null },
   },
 
-  review: { type: ReviewSchema, default: undefined },
+  // review: { type: ReviewSchema, default: undefined },
 
 });
 // Helpful indexes
-AssetSchema.index({ "review.status": 1 });
+// AssetSchema.index({ "review.status": 1 });
 
 AssetSchema.index({ "approval.status": 1 });
 
